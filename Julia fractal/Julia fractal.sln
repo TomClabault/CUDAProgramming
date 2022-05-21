@@ -5,6 +5,8 @@ VisualStudioVersion = 17.2.32505.173
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Julia fractal", "Julia fractal\Julia fractal.vcxproj", "{89D4A3B8-8D7E-412F-96B2-02F793BD2D7E}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "SetupJuliaFractal", "SetupJuliaFractal\SetupJuliaFractal.vdproj", "{BF6C15B0-E858-40C2-AE21-B8ABFEFF87C8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,6 +17,9 @@ Global
 		{89D4A3B8-8D7E-412F-96B2-02F793BD2D7E}.Debug|x64.Build.0 = Debug|x64
 		{89D4A3B8-8D7E-412F-96B2-02F793BD2D7E}.Release|x64.ActiveCfg = Release|x64
 		{89D4A3B8-8D7E-412F-96B2-02F793BD2D7E}.Release|x64.Build.0 = Release|x64
+		{BF6C15B0-E858-40C2-AE21-B8ABFEFF87C8}.Debug|x64.ActiveCfg = Debug
+		{BF6C15B0-E858-40C2-AE21-B8ABFEFF87C8}.Release|x64.ActiveCfg = Release
+		{BF6C15B0-E858-40C2-AE21-B8ABFEFF87C8}.Release|x64.Build.0 = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
