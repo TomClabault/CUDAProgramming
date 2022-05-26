@@ -5,6 +5,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "benchOptions.h"
 
@@ -49,6 +50,16 @@ int juliaCPU(int x, int y)
     return 1;
 }
 
+const int rainbowColors[6][3] =
+{
+    {255, 0, 0},   //Red
+    {255, 255, 0}, //Yellow
+    {0, 255, 0},   //Green
+    {0, 255, 255}, //Cyan
+    {0, 0, 255},   //Blue
+    {255, 0, 255}, //Magenta
+};
+
 void kernelCPU(unsigned char* ptr)
 {
     for (int y = 0; y < HEIGHT; y++)
@@ -57,10 +68,26 @@ void kernelCPU(unsigned char* ptr)
         {
             int offset = x + y * WIDTH;
 
+            float RGBpercent = (float)x / (WIDTH - 1);
+            int firstColorIndex = (RGBpercent != 0) * ((int)ceil(RGBpercent * 6) - 1);
+
+            int color[3] = { 0, 0, 0 };
+            int secondColorIndex = (firstColorIndex + 1) % 6;
+
+            float lowerBound = ((float)firstColorIndex / 6) * (firstColorIndex != 0);
+            float upperBound = 1 * (firstColorIndex + 1 == 6) + ((float)secondColorIndex / 6) * (firstColorIndex + 1 != 6);//TODO remplacer par lower bound + 1/6
+
+            float lerpPercent = 1.0 / ((upperBound - lowerBound) / (RGBpercent - lowerBound));
+
+            color[0] = rainbowColors[firstColorIndex][0] * (1 - lerpPercent) + rainbowColors[secondColorIndex][0] * lerpPercent;
+            color[1] = rainbowColors[firstColorIndex][1] * (1 - lerpPercent) + rainbowColors[secondColorIndex][1] * lerpPercent;
+            color[2] = rainbowColors[firstColorIndex][2] * (1 - lerpPercent) + rainbowColors[secondColorIndex][2] * lerpPercent;
+
             int juliaValue = juliaCPU(x, y);
-            ptr[offset * 3 + 0] = 255 * juliaValue;
-            ptr[offset * 3 + 1] = 0;
-            ptr[offset * 3 + 1] = 0;
+
+            ptr[offset * 3 + 0] = color[0] * juliaValue;
+            ptr[offset * 3 + 1] = color[1] * juliaValue;
+            ptr[offset * 3 + 2] = color[2] * juliaValue;
         }
     }
 }
