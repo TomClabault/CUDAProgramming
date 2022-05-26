@@ -65,18 +65,18 @@ __device__  int juliaGPU(int x, int y)
     return 1;
 }
 
+__constant__ int rainbowColors[6][3] =
+{
+    {255, 0, 0},   //Red
+    {255, 255, 0}, //Yellow
+    {0, 255, 0},   //Green
+    {0, 255, 255}, //Cyan
+    {0, 0, 255},   //Blue
+    {255, 0, 255}, //Magenta
+};
+
 __global__ void kernelGPU(unsigned char* ptr) 
 {
-    const int rainbowColors[6][3] =
-    {
-        {255, 0, 0},   //Red
-        {255, 255, 0}, //Yellow
-        {0, 255, 0},   //Green
-        {0, 255, 255}, //Cyan
-        {0, 0, 255},   //Blue
-        {255, 0, 255}, //Magenta
-    };
-
     //TODO calculer x et Y d'abord et ensuite thread id, ça évitera le modulo et la div dans le while
     int threadId = gridDim.x * blockDim.x * blockDim.y * blockIdx.y + blockIdx.x * blockDim.x * blockDim.y + threadIdx.x + threadIdx.y * blockDim.x;
 

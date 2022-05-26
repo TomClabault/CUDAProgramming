@@ -44,7 +44,7 @@ void juliaGPU(unsigned char* ptr)
 
     cudaEventRecord(start, 0);
     for (int i = 0; i < ITER; i++)
-        kernelGPU<<<dim3(2, 2), dim3(16, 16) >> > (dev_ptr);
+        kernelGPU<<<dim3(16, 16), dim3(32, 32) >> > (dev_ptr);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
 
@@ -56,7 +56,7 @@ void juliaGPU(unsigned char* ptr)
 
     printf("GPU: %.3fms\n", duration / ITER);
 
-    //writeToDisk(ptr, "OutputGPU.bmp");
+    writeToDisk(ptr, "OutputGPU.bmp");
 }
 
 void juliaCPU(unsigned char* ptr)
