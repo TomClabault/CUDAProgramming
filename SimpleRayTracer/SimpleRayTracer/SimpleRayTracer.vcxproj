@@ -80,9 +80,11 @@
     <CudaCompile Include="bitmap.cu" />
     <CudaCompile Include="kernelGPU.cu" />
     <CudaCompile Include="kernelCPU.cu" />
+    <CudaCompile Include="YUV4MPEG2.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bitmap.h" />
+    <ClInclude Include="YUV4MPEG2.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cu" />

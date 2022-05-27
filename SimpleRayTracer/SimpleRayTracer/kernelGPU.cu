@@ -3,6 +3,7 @@
 #endif // __CUDACC__
 
 #include "bitmap.h"
+#include "YUV4MPEG2.cuh"
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -10,15 +11,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define WIDTH 1280
+#define HEIGHT 720
+
+#define NB_FRAMES 5
+#define FRAMES_PER_SECOND 1
+
 #define NB_SPHERES 20
 
-#define WIDTH 3840*4
-#define HEIGHT 2160*4
-
-#define THREAD_PER_BLOCKS 16
+#define THREAD_PER_BLOCKS 32
 
 #define INF 2e10
 #define rnd( x ) (x * rand() / RAND_MAX)
+
+#define HANDLE_ERROR(code) if(code != 0) printf("Error code: %d\n", code);
 
 typedef struct Sphere
 {
@@ -44,7 +50,7 @@ typedef struct Sphere
 
 __constant__ Sphere spheres[NB_SPHERES];
 
-__global__ void rayTracerGPU(unsigned char* output)
+__global__ void generateRTFrameYCbCr(unsigned char* output)
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -75,9 +81,21 @@ __global__ void rayTracerGPU(unsigned char* output)
 			}
 		}
 
-		output[threadId * 3 + 0] = (int)(r*255);
-		output[threadId * 3 + 1] = (int)(g*255);
-		output[threadId * 3 + 2] = (int)(b*255);
+		int rInt = (int)(r * 255);
+		int gInt = (int)(g * 255);
+		int bInt = (int)(b * 255);
+
+		rInt = 255;
+		gInt = 0;
+		bInt = 0;
+
+		output[threadId * 3 + 0] = 16 + (65.738 * rInt + 129.057 * gInt + 25.064 * bInt) / 256,
+		output[threadId * 3 + 1] = 128 + (-37.945 * rInt - 74.494 * gInt + 112.439 * bInt) / 256,
+		output[threadId * 3 + 2] = 128 + (112.439 * rInt - 94.154 * gInt - 18.285 * bInt) / 256,
+
+		/*output[threadId * 3 + 0] = (int)(0.299 * rInt + 0.587 * gInt + 0.114 * bInt);
+		output[threadId * 3 + 1] = (int)(- 0.1687 * rInt - 0.3313 * gInt + 0.5 * bInt + 128);
+		output[threadId * 3 + 2] = (int)(0.5 * rInt -0.4187 * gInt - 0.0813 * bInt + 128);*/
 
 		threadId += gridDim.x * gridDim.y * blockDim.x * blockDim.y;
 	}
@@ -85,46 +103,43 @@ __global__ void rayTracerGPU(unsigned char* output)
 
 int benchmarkGPU()
 {
+	char header[128];
+	generateYUV4MPEG2Header(header, WIDTH, HEIGHT, FRAMES_PER_SECOND, "444");
+
+	FILE* output = fopen("OutputVideo.y4m", "w+");
+	fwrite(header, sizeof(unsigned char), strlen(header), output);
+	fclose(output);
+
 	Sphere* host_spheres = (Sphere*)malloc(sizeof(Sphere) * NB_SPHERES);
+
 	unsigned char* host_output = (unsigned char*)malloc(sizeof(unsigned char) * WIDTH * HEIGHT * 3);
 	unsigned char* dev_output;
-
-	cudaMalloc(&dev_output, sizeof(unsigned char) * WIDTH * HEIGHT * 3);
-
-	for (int i = 0; i < NB_SPHERES; i++)
-	{
-		host_spheres[i].r = rnd(1.0f);
-		host_spheres[i].g = rnd(1.0f);
-		host_spheres[i].b = rnd(1.0f);
-		host_spheres[i].x = rnd(1000.0f) - 500;
-		host_spheres[i].y = rnd(1000.0f) - 500;
-		host_spheres[i].z = rnd(1000.0f) - 500;
-		host_spheres[i].radius = rnd(100.0f) + 20;
-	}
-
-	cudaMemcpyToSymbol(spheres, host_spheres, sizeof(Sphere) * NB_SPHERES);
-
-
+	HANDLE_ERROR(cudaMalloc(&dev_output, sizeof(unsigned char) * WIDTH * HEIGHT * 3));
+	
 	dim3 blocks((WIDTH + 15) / THREAD_PER_BLOCKS, (HEIGHT + 15) / THREAD_PER_BLOCKS);
 	dim3 threads(THREAD_PER_BLOCKS, THREAD_PER_BLOCKS);
+	for (int frame = 0; frame < NB_FRAMES; frame++)
+	{
+		for (int i = 0; i < NB_SPHERES; i++)
+		{
+			host_spheres[i].r = rnd(1.0f);
+			host_spheres[i].g = rnd(1.0f);
+			host_spheres[i].b = rnd(1.0f);
+			host_spheres[i].x = rnd(1000) - 500;
+			host_spheres[i].y = rnd(1000) - 500;
+			host_spheres[i].z = rnd(1000) - 500;
+			host_spheres[i].radius = rnd(100.0f) + 20;
+		}
 
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
+		cudaMemcpyToSymbol(spheres, host_spheres, sizeof(Sphere) * NB_SPHERES);
 
-	cudaEventRecord(start, 0);
-	rayTracerGPU << <blocks, threads >> > (dev_output);
-	cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
+		generateRTFrameYCbCr <<<blocks, threads>>> (dev_output);
 
-	float duration;
-	cudaEventElapsedTime(&duration, start, stop);
+		cudaMemcpy(host_output, dev_output, sizeof(unsigned char) * WIDTH * HEIGHT * 3, cudaMemcpyDeviceToHost);
 
-	printf("GPU Time: %.3fms\n", duration);
+		addFrameToFile((char*)"OutputVideo.y4m", WIDTH, HEIGHT, host_output);
+	}
 
-	cudaMemcpy(host_output, dev_output, sizeof(unsigned char) * WIDTH * HEIGHT * 3, cudaMemcpyDeviceToHost);
-
-	generateBitmapImage(host_output, HEIGHT, WIDTH, "OutputRTGPU.bmp");
-
+	system("start OutputVideo.y4m");
 	return 0;
 }
