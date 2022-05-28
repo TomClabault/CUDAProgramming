@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 const int BYTES_PER_PIXEL = 3; /// red, green, & blue
 const int FILE_HEADER_SIZE = 14;
@@ -81,4 +82,58 @@ void generateBitmapImage(unsigned char* image, int height, int width, char* imag
     }
 
     fclose(imageFile);
+}
+
+void readWidthHeight(FILE* inputFile, int* width, int* height)
+{
+    int infoHeaderSize;
+
+    fseek(inputFile, FILE_HEADER_SIZE, SEEK_SET);
+
+    fread(&infoHeaderSize, sizeof(int), 1, inputFile);
+    fread(width, sizeof(int), 1, inputFile);
+    fread(height, sizeof(int), 1, inputFile);
+    fseek(inputFile, infoHeaderSize - 12, SEEK_CUR);//-12 because we already read 3 ints
+}
+
+/*
+* Reads a bmp image from disk, allocates the necessary space in 'output' and fills 'output' with the image bytes.
+* Also fills 'width' and 'height' with the width and the height of the read image
+*/
+void readBitmapImage(unsigned char** output, int* width, int* height, char* imageFileName)
+{
+    FILE* inputFile = fopen(imageFileName, "rb");
+    readWidthHeight(inputFile, width, height);
+
+    *output = (unsigned char*)malloc(sizeof(unsigned char) * *width * *height * 3);
+    if (*output == NULL)
+        return;
+
+    int padding = (*width * 3) % 4;
+    if(padding != 0)
+        for (int i = 0; i < *height; i++)
+        {
+            fread(*output, sizeof(unsigned char), *width * 3, inputFile);
+            fseek(inputFile, padding, SEEK_CUR);//Skipping the padding
+        }
+    else
+        fread(*output, sizeof(unsigned char), *width * *height * 3, inputFile);
+
+}
+
+void BGRToRGB(unsigned char* imageBytes, int width, int height)
+{
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            int offset = (x + y * width) * 3;
+
+            int currentBlue  = imageBytes[offset + 0];
+            int currentRed   = imageBytes[offset + 2];
+
+            imageBytes[offset + 0] = currentRed;
+            imageBytes[offset + 2] = currentBlue;
+        }
+    }
 }

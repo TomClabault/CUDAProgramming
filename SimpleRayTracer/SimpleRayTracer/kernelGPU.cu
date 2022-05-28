@@ -81,17 +81,9 @@ __global__ void generateRTFrameYCbCr(unsigned char* output)
 			}
 		}
 
-		int rInt = (int)(r * 255);
-		int gInt = (int)(g * 255);
-		int bInt = (int)(b * 255);
-
-		rInt = 255;
-		gInt = 0;
-		bInt = 0;
-
-		output[threadId * 3 + 0] = 16 + (65.738 * rInt + 129.057 * gInt + 25.064 * bInt) / 256,
-		output[threadId * 3 + 1] = 128 + (-37.945 * rInt - 74.494 * gInt + 112.439 * bInt) / 256,
-		output[threadId * 3 + 2] = 128 + (112.439 * rInt - 94.154 * gInt - 18.285 * bInt) / 256,
+		output[threadId * 3 + 0] = (int)(r * 255),
+		output[threadId * 3 + 1] = (int)(b * 255),
+		output[threadId * 3 + 2] = (int)(r * 255),
 
 		/*output[threadId * 3 + 0] = (int)(0.299 * rInt + 0.587 * gInt + 0.114 * bInt);
 		output[threadId * 3 + 1] = (int)(- 0.1687 * rInt - 0.3313 * gInt + 0.5 * bInt + 128);
