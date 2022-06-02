@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CudaCompile Include="bitmap.cu" />
+    <CudaCompile Include="cannyEdgeDectection.cu" />
+    <CudaCompile Include="main.cu" />
+    <CudaCompile Include="rgbManip.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="headers">
+      <UniqueIdentifier>{631ee773-583b-46ab-8b97-227ca594edc5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bitmap.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cannyEdgeDectection.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="rgbManip.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

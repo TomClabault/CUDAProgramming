@@ -5,45 +5,100 @@
 #include <stdlib.h>
 
 #include "bitmap.h"
+#include "cannyEdgeDectection.h"
+#include "common.h"
+#include "rgbManip.h"
 
-__global__ void rgbToGrayscale(unsigned char* input, int width, int height, unsigned char* output);
-
-__host__ void computeGaussianKernel(float* gaussianKernel, int size, float sigma);
-__global__ void cannyEdgeDectection(unsigned char* grayscaleInput, int width, int height, unsigned char* grayscaleOutput);
-
-extern __constant__ float constGaussianKernel5x5[5*5];
+#define IN_IMAGE_NAME "mhwWallpaper4k.bmp"
+//#define IN_IMAGE_NAME "lizard.bmp"
 
 int main()
 {
-	unsigned char* inputImageBytes;
-	unsigned char* dev_inputImageBytes;
+	unsigned char* fullBytesImageBuffer;
+	int width, height;
 
-	int imageWidth, imageHeight;
-	readBitmapImage(&inputImageBytes, &imageWidth, &imageHeight, "lizard.bmp");
+	readBitmapImage(&fullBytesImageBuffer, &width, &height, IN_IMAGE_NAME);
 
-	BGRToRGB(inputImageBytes, imageWidth, imageHeight);
-
-	unsigned char* imageGrayScale = (unsigned char*)malloc(sizeof(unsigned char) * imageWidth * imageHeight);
-	unsigned char* dev_imageGrayScale;
-
-	cudaMalloc(&dev_inputImageBytes, sizeof(unsigned char) * imageWidth * imageHeight);
-	cudaMalloc(&dev_imageGrayScale, sizeof(unsigned char) * imageWidth * imageHeight);
-	cudaMemcpy(dev_inputImageBytes, inputImageBytes, sizeof(unsigned char) * imageWidth * imageHeight, cudaMemcpyHostToDevice);
-
-	float* gaussianKernel5x5 = (float*)malloc(sizeof(float*) * 5 * 5);
-
+	unsigned char* dev_fullBytesImageBuffer;
+	CUDA_HANDLE_ERROR(cudaMalloc(&dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3), "Cuda malloc");
+	CUDA_HANDLE_ERROR(cudaMemcpy(dev_fullBytesImageBuffer, fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyHostToDevice), "Cuda memcpy to dev_fullBytesImageBuffer");
+	
+	float gaussianKernel5x5[5 * 5];
 	computeGaussianKernel(gaussianKernel5x5, 5, 1);
-	for (int y = 0; y < 5; y++)
-	{
-		for (int x = 0; x < 5; x++)
-			printf("%.3f ", gaussianKernel5x5[y * 5 + x]);
-		printf("\n");
-	}
+	copyGaussianKernelToConstMem(gaussianKernel5x5);
 
-	cudaMemcpyToSymbol(constGaussianKernel5x5, gaussianKernel5x5, sizeof(float) * 5 * 5, 0, cudaMemcpyHostToDevice);
+	unsigned char* dev_grayBytesImageBuffer;
+	unsigned char* dev_grayBytesOutCannyDetectionBuffer;
+	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesImageBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes buffer");
+	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesOutCannyDetectionBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes canny out buffer");
+	cuda_rgbToGrayscale<<<128, 128>>>(dev_fullBytesImageBuffer, width, height, dev_grayBytesImageBuffer);
 
-	rgbToGrayscale<<<128, 128>>>(dev_inputImageBytes, imageWidth, imageHeight, dev_imageGrayScale);
-	cannyEdgeDectection<<<128, 128>>>(dev_imageGrayScale, imageWidth, imageHeight, dev_imageGrayScale);
+	cannyEdgeDetection(dev_grayBytesImageBuffer, width, height, dev_grayBytesOutCannyDetectionBuffer);
 
-	generateBitmapImage(inputImageBytes, imageHeight, imageWidth, "outGray.bmp");
+	cuda_grayBytesToGray3Bytes<<<128, 128>>>(dev_grayBytesOutCannyDetectionBuffer, width, height, dev_fullBytesImageBuffer);
+	CUDA_HANDLE_ERROR(cudaMemcpy(fullBytesImageBuffer, dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyDeviceToHost), "Memcpy device to host fullImageBytesBuffer");
+
+	char outName[256];
+	sprintf(outName, "out%s", IN_IMAGE_NAME);
+	generateBitmapImage(fullBytesImageBuffer, height, width, outName);
+
+	char startString[256];
+	sprintf(startString, "start %s", outName);
+	system(startString);
 }
+
+//int main()
+//{
+//	unsigned char** imageBytes;
+//	unsigned char* dev_inputImageBytes;
+//
+//	int imageWidth, imageHeight;
+//	readBitmapImage2D(&imageBytes, &imageWidth, &imageHeight, IN_IMAGE_NAME);
+//	BGRToRGB2D(imageBytes, imageWidth, imageHeight);//TODO, this is unecessary because we can just treat the bytes in the BGR order in the code
+//
+//	unsigned char* imageGrayScale = (unsigned char*)malloc(sizeof(unsigned char) * imageWidth * imageHeight);
+//	unsigned char* dev_cannyEdgeResult;
+//
+//	cudaArray_t dev_imageGrayScaleArray;
+//	cudaChannelFormatDesc desc = cudaCreateChannelDesc<unsigned char>();
+//	CUDA_HANDLE_ERROR(cudaMallocArray(&dev_imageGrayScaleArray, &desc, imageWidth, imageHeight, 0), "Cuda malloc array");
+//
+//	CUDA_HANDLE_ERROR(cudaMalloc(&dev_inputImageBytes, sizeof(unsigned char) * imageWidth * imageHeight * 3), "Cuda malloc inputImageBytes");
+//	CUDA_HANDLE_ERROR(cudaMalloc(&dev_cannyEdgeResult, sizeof(unsigned char) * imageWidth * imageHeight), "Cuda malloc dev_cannyEdgeResult");
+//
+//	CUDA_HANDLE_ERROR(cudaMemcpy(dev_inputImageBytes, imageBytes, sizeof(unsigned char) * imageWidth * imageHeight * 3, cudaMemcpyHostToDevice), "Cuda memcpy inputImageBytes");
+//
+//	float gaussianKernel5x5[5 * 5];
+//
+//	computeGaussianKernel(gaussianKernel5x5, 5, 1);
+//	copyGaussianKernelToConstMem(gaussianKernel5x5);
+//
+//	rgbToGrayscale<<<128, 128>>>(dev_inputImageBytes, imageWidth, imageHeight, dev_imageGrayScale);
+//	CUDA_HANDLE_ERROR(cudaFree(dev_inputImageBytes), "Cuda free dev_inputImagesBytes");
+//	bindImageToTextureMemory(dev_imageGrayScaleArray, imageWidth, imageHeight);
+//
+//	cudaEvent_t start, stop;
+//	cudaEventCreate(&start);
+//	cudaEventCreate(&stop);
+//
+//	cudaEventRecord(start);
+//	cannyEdgeDectection<<<128, 128>>>(dev_cannyEdgeResult, imageWidth, imageHeight);
+//	cudaEventRecord(stop);
+//	cudaEventSynchronize(stop);
+//
+//	float cannyEdgeDectectionDuration = 0;
+//	cudaEventElapsedTime(&cannyEdgeDectectionDuration, start, stop);
+//	printf("Canny edge dectection time: %.3fms\n", cannyEdgeDectectionDuration);
+//
+//	CUDA_HANDLE_ERROR(cudaMemcpy(imageGrayScale, dev_cannyEdgeResult, sizeof(unsigned char) * imageWidth * imageHeight, cudaMemcpyDeviceToHost), "Cuda memcpy dev_imageGrayScale to imageBytes");
+//
+//	grayscaleToGrayscale3Bytes2D(imageGrayScale, imageWidth, imageHeight, imageBytes);
+//	//BGRToRGB(imageBytes, imageWidth, imageHeight);//TODO, this is unecessary because we can just treat the bytes in the BGR order in the code
+//
+//	char imageOutName[256];
+//	sprintf(imageOutName, "out%s", IN_IMAGE_NAME);
+//
+//	generateBitmapImage(imageBytes, imageHeight, imageWidth, imageOutName);
+//
+//	printf("\nDone.\n");
+//}
