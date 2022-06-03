@@ -1,2 +1,2 @@
 [WarpWatch]
-Expressions=centerPixelX, centerPixelY, pixelX, pixelY, kernelLinearIndex, pixelLinearIndex, outPixelValue
+Expressions=stride, remainder, pixelOffset, pixelOffset + i, threadCount, threadId, i, input[8335776 + i*3]

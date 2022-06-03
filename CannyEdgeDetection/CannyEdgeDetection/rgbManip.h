@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 
 __global__ void cuda_rgbToGrayscale(unsigned char* input, int width, int height, unsigned char* output);
+__global__ void cuda_rgbToGrayscale3(unsigned char* input, int width, int height, unsigned char* output);
 __global__ void cuda_rgbToGrayscale2D(unsigned char** input, int width, int height, unsigned char** output);
 
 __host__ void BGRToRGB(unsigned char* imageBytes, int width, int height);

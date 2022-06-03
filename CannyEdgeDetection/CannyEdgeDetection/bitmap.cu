@@ -119,7 +119,7 @@ void readWidthHeight(FILE* inputFile, int* width, int* height)
 	fread(&infoHeaderSize, sizeof(int), 1, inputFile);
 	fread(width, sizeof(int), 1, inputFile);
 	fread(height, sizeof(int), 1, inputFile);
-	fseek(inputFile, infoHeaderSize - 12, SEEK_CUR);//-12 because we already read 3 ints
+	fseek(inputFile, infoHeaderSize - 12, SEEK_CUR);//Skipping the rest of the header. -12 because we already read 3 ints
 }
 
 /*

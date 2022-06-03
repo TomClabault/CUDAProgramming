@@ -4,4 +4,4 @@ __host__ void cannyEdgeDetection(unsigned char* graysclaeInput, int width, int h
 //__global__ void cannyEdgeDectection2D(unsigned char* grayscaleOutput, int width, int height);
 
 __host__ void computeGaussianKernel(float* gaussianKernel, int size, float sigma);
-__host__ void copyGaussianKernelToConstMem(float* gaussianKernel);
+__host__ cudaError_t copyGaussianKernelToConstMem(float* gaussianKernel);

@@ -9,8 +9,18 @@
 #include "common.h"
 #include "rgbManip.h"
 
-#define IN_IMAGE_NAME "mhwWallpaper4k.bmp"
-//#define IN_IMAGE_NAME "lizard.bmp"
+#define IN_IMAGE_NAME "madame.bmp"
+
+void saveImageAndOpen(unsigned char* fullBytesImageBuffer, int width, int height)
+{
+	char outName[256];
+	sprintf(outName, "out%s", IN_IMAGE_NAME);
+	generateBitmapImage(fullBytesImageBuffer, height, width, outName);
+
+	char startString[256];
+	sprintf(startString, "start %s", outName);
+	system(startString);
+}
 
 int main()
 {
@@ -20,31 +30,31 @@ int main()
 	readBitmapImage(&fullBytesImageBuffer, &width, &height, IN_IMAGE_NAME);
 
 	unsigned char* dev_fullBytesImageBuffer;
-	CUDA_HANDLE_ERROR(cudaMalloc(&dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3), "Cuda malloc");
+	CUDA_HANDLE_ERROR(cudaMalloc(&dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3), "Cuda malloc dev_fullBytesImageBuffer");
 	CUDA_HANDLE_ERROR(cudaMemcpy(dev_fullBytesImageBuffer, fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyHostToDevice), "Cuda memcpy to dev_fullBytesImageBuffer");
 	
 	float gaussianKernel5x5[5 * 5];
 	computeGaussianKernel(gaussianKernel5x5, 5, 1);
-	copyGaussianKernelToConstMem(gaussianKernel5x5);
+	CUDA_HANDLE_ERROR(copyGaussianKernelToConstMem(gaussianKernel5x5), "Cuda memcpy to symbol gaussianKernel");
 
 	unsigned char* dev_grayBytesImageBuffer;
 	unsigned char* dev_grayBytesOutCannyDetectionBuffer;
 	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesImageBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes buffer");
 	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesOutCannyDetectionBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes canny out buffer");
-	cuda_rgbToGrayscale<<<128, 128>>>(dev_fullBytesImageBuffer, width, height, dev_grayBytesImageBuffer);
 
-	cannyEdgeDetection(dev_grayBytesImageBuffer, width, height, dev_grayBytesOutCannyDetectionBuffer);
+	CUDA_TICKTOCK_DECLARE();
+	CUDA_TICK();
+	cuda_rgbToGrayscale<<<512, 512>>>(dev_fullBytesImageBuffer, width, height, dev_grayBytesImageBuffer);
+	CUDA_TOCK("rgbToGrayscale");
 
+	cannyEdgeDetection(dev_grayBytesImageBuffer, width, height, dev_grayBytesOutCannyDetectionBuffer);//Already tick-tocked
+
+	CUDA_TICK();
 	cuda_grayBytesToGray3Bytes<<<128, 128>>>(dev_grayBytesOutCannyDetectionBuffer, width, height, dev_fullBytesImageBuffer);
+	CUDA_TOCK("grayToGray3Bytes");
 	CUDA_HANDLE_ERROR(cudaMemcpy(fullBytesImageBuffer, dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyDeviceToHost), "Memcpy device to host fullImageBytesBuffer");
 
-	char outName[256];
-	sprintf(outName, "out%s", IN_IMAGE_NAME);
-	generateBitmapImage(fullBytesImageBuffer, height, width, outName);
-
-	char startString[256];
-	sprintf(startString, "start %s", outName);
-	system(startString);
+	saveImageAndOpen(fullBytesImageBuffer, width, height);
 }
 
 //int main()
