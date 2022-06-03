@@ -127,50 +127,6 @@ __global__ void cuda_cannyEdgeDectection(unsigned char* grayscaleInput, int widt
 	computeGradientIntensityEdgeDir(grayscaleOutput, width, height, gradientIntensityOutput, edgeDirectionOutput);
 }
 
-#define BENCHMARK_BLOCK_SIZE_THREAD_COUNT(iteration, blockSizeLimit, threadCountLimit, ...) do {\
-	float minAverageTime = 10000000;\
-	int bestBlockSize = 0;\
-	int bestThreadsCount = 0;\
-	\
-	for (int blockSize = 8; blockSize < blockSizeLimit; blockSize += 16)\
-	{\
-		for (int threadCount = 8; threadCount < threadCountLimit; threadCount += 8)\
-		{\
-			float totalIterationsDuration = 0.0;\
-			\
-			for (int i = 0; i < iteration; i++)\
-			{\
-				cudaEvent_t start, stop;\
-				cudaEventCreate(&start);\
-				cudaEventCreate(&stop);\
-				\
-				cudaEventRecord(start);\
-				__VA_ARGS__;\
-				cudaEventRecord(stop);\
-				cudaEventSynchronize(stop);\
-				\
-				float iterationDuration = 0;\
-				cudaEventElapsedTime(&iterationDuration, start, stop);\
-				cudaEventDestroy(start);\
-				cudaEventDestroy(stop);\
-				\
-				totalIterationsDuration += iterationDuration;\
-			}\
-			\
-			printf("[%03d, %03d] took %.3fms\n", blockSize, threadCount, totalIterationsDuration / iteration);\
-			\
-			if (totalIterationsDuration / iteration < minAverageTime)\
-			{\
-				bestBlockSize = blockSize;\
-				bestThreadsCount = threadCount;\
-				\
-				minAverageTime = totalIterationsDuration / iteration;\
-			}\
-		}\
-	}\
-	printf("Best settings are: [%d, %d] with %.3fms\n", bestBlockSize, bestThreadsCount, minAverageTime);\
-	} while(0)
-
 //TODO cannyEdgeDetection alloc function qui fait l'allocation nécessaire de l'image pour pas avoir à la refaire à chaque fois qu'on cal cannyEdge et mettre les buffers en variables globales
 __host__ void cannyEdgeDetection(unsigned char* grayscaleInput, int width, int height, unsigned char* grayscaleOutput)
 {
@@ -180,12 +136,7 @@ __host__ void cannyEdgeDetection(unsigned char* grayscaleInput, int width, int h
 	cudaMalloc(&gradientIntensityBuffer, sizeof(unsigned char) * width * height);
 	cudaMalloc(&edgeDirectionBuffer, sizeof(float) * width * height);
 
-	BENCHMARK_BLOCK_SIZE_THREAD_COUNT(25, 2048, 512, cuda_cannyEdgeDectection << <blockSize, threadCount >> > (grayscaleInput, width, height, grayscaleOutput, gradientIntensityBuffer, edgeDirectionBuffer));
-
-	//CUDA_TICKTOCK_DECLARE();
-	//CUDA_TICK();
-	
-	//CUDA_TOCK("Canny edge detection");
+	CUDA_TIME_EXECUTION("Canny edge detection", cuda_cannyEdgeDectection << <512, 256 >> > (grayscaleInput, width, height, grayscaleOutput, gradientIntensityBuffer, edgeDirectionBuffer));
 
 	cudaMemcpy(grayscaleOutput, gradientIntensityBuffer, sizeof(unsigned char) * width * height, cudaMemcpyDeviceToHost);
 }

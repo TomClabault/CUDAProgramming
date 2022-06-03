@@ -9,7 +9,7 @@
 #include "common.h"
 #include "rgbManip.h"
 
-#define IN_IMAGE_NAME "madame.bmp"
+#define IN_IMAGE_NAME "emmaStone.bmp"
 
 void saveImageAndOpen(unsigned char* fullBytesImageBuffer, int width, int height)
 {
@@ -42,16 +42,12 @@ int main()
 	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesImageBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes buffer");
 	CUDA_HANDLE_ERROR(cudaMalloc(&dev_grayBytesOutCannyDetectionBuffer, sizeof(unsigned char) * width * height), "Cuda malloc gray bytes canny out buffer");
 
-	CUDA_TICKTOCK_DECLARE();
-	CUDA_TICK();
-	cuda_rgbToGrayscale<<<512, 512>>>(dev_fullBytesImageBuffer, width, height, dev_grayBytesImageBuffer);
-	CUDA_TOCK("rgbToGrayscale");
+	CUDA_TIME_EXECUTION("rgbToGrayscale", cuda_rgbToGrayscale << <512, 512 >> > (dev_fullBytesImageBuffer, width, height, dev_grayBytesImageBuffer));
 
 	cannyEdgeDetection(dev_grayBytesImageBuffer, width, height, dev_grayBytesOutCannyDetectionBuffer);//Already tick-tocked
 
-	CUDA_TICK();
-	cuda_grayBytesToGray3Bytes<<<128, 128>>>(dev_grayBytesOutCannyDetectionBuffer, width, height, dev_fullBytesImageBuffer);
-	CUDA_TOCK("grayToGray3Bytes");
+	CUDA_TIME_EXECUTION("grayToGray3Bytes", cuda_grayBytesToGray3Bytes << <128, 128 >> > (dev_grayBytesOutCannyDetectionBuffer, width, height, dev_fullBytesImageBuffer));
+
 	CUDA_HANDLE_ERROR(cudaMemcpy(fullBytesImageBuffer, dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyDeviceToHost), "Memcpy device to host fullImageBytesBuffer");
 
 	saveImageAndOpen(fullBytesImageBuffer, width, height);
