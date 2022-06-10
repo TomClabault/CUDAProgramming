@@ -1,2 +1,2 @@
 [WarpWatch]
-Expressions=stride, remainder, pixelOffset, pixelOffset + i, threadCount, threadId, i, input[8335776 + i*3]
+Expressions=indexLeft, indexRight, threadId

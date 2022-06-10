@@ -1,15 +1,18 @@
 ﻿#include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
+#include <iostream>
+#include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 #include "bitmap.h"
 #include "cannyEdgeDectection.h"
 #include "common.h"
 #include "rgbManip.h"
 
-#define IN_IMAGE_NAME "emmaStone.bmp"
+#define IN_IMAGE_NAME "mhwWallpaper.bmp"
 
 void saveImageAndOpen(unsigned char* fullBytesImageBuffer, int width, int height)
 {
@@ -22,10 +25,60 @@ void saveImageAndOpen(unsigned char* fullBytesImageBuffer, int width, int height
 	system(startString);
 }
 
+char* execSystemCommand(const char* cmd) 
+{
+	char buffer[128];
+	char* result = (char*)calloc(65536, sizeof(char));
+	FILE* pipe = _popen(cmd, "r");
+	if (!pipe) throw std::runtime_error("popen() failed!");
+	try {
+		while (fgets(buffer, sizeof buffer, pipe) != NULL) 
+		{
+			strcat(result, buffer);
+		}
+	}
+	catch (...) {
+		_pclose(pipe);
+		throw;
+	}
+	_pclose(pipe);
+	return result;
+}
+
+void killAllProcessesByName(const char* processName)
+{
+	char command[256];
+	sprintf(command, "tasklist /FI \"IMAGENAME eq %s\" /FO LIST | findstr \"PID:\"", processName);
+
+	char* PIDList = execSystemCommand(command);
+	char PIDString[16] = {0};
+	while (*PIDList != 0)
+	{
+		int index = 0;
+		if (*PIDList >= '0' && *PIDList <= '9')
+		{
+			while (*PIDList >= '0' && *PIDList <= '9')
+			{
+				PIDString[index++] = *PIDList;
+
+				PIDList++;
+			}
+
+			char killCommand[128];
+			sprintf(killCommand, "taskkill /pid %d", atoi(PIDString));
+			system(killCommand);
+		}
+		else
+			PIDList++;
+	}
+}
+
 int main()
 {
 	unsigned char* fullBytesImageBuffer;
 	int width, height;
+
+	killAllProcessesByName("ImageGlass.exe");
 
 	readBitmapImage(&fullBytesImageBuffer, &width, &height, IN_IMAGE_NAME);
 
@@ -33,9 +86,9 @@ int main()
 	CUDA_HANDLE_ERROR(cudaMalloc(&dev_fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3), "Cuda malloc dev_fullBytesImageBuffer");
 	CUDA_HANDLE_ERROR(cudaMemcpy(dev_fullBytesImageBuffer, fullBytesImageBuffer, sizeof(unsigned char) * width * height * 3, cudaMemcpyHostToDevice), "Cuda memcpy to dev_fullBytesImageBuffer");
 	
-	float gaussianKernel5x5[5 * 5];
-	computeGaussianKernel(gaussianKernel5x5, 5, 1);
-	CUDA_HANDLE_ERROR(copyGaussianKernelToConstMem(gaussianKernel5x5), "Cuda memcpy to symbol gaussianKernel");
+	float gaussianKernel[GAUSSIAN_KERNEL_SIZE * GAUSSIAN_KERNEL_SIZE];
+	computeGaussianKernel(gaussianKernel, GAUSSIAN_KERNEL_SIZE, GAUSSIAN_KERNEL_SIGMA);
+	CUDA_HANDLE_ERROR(copyGaussianKernelToConstMem(gaussianKernel), "Cuda memcpy to symbol gaussianKernel");
 
 	unsigned char* dev_grayBytesImageBuffer;
 	unsigned char* dev_grayBytesOutCannyDetectionBuffer;
